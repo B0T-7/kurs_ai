@@ -1,0 +1,12 @@
+{
+  "tytul": "inżyneria wsteczna",
+  "opis": "Praca ma na celu nauczyć nas jak ułatwiać sobie pracę przy użyciu narzedzi AI przy pracy z obrazem oraz jak powinny brzmieć dokładne prompty do generowania obrazu.",
+  "narzedzia": [
+    "firefly adobe",
+    "Google Gemini AI"
+  ],
+  "szczegoly": "",
+  "prompt": "Realistyczne, wysokiej rozdzielczości zdjęcie przedstawiające turystkę od tyłu, stojącą na punkcie widokowym i podziwiającą zapierający dech w piersiach krajobraz. Ma na sobie swobodny strój podróżny i plecak. Przed nią rozciąga się malownicza panorama bujnych, zielonych wzgórz, falujących dolin oraz dramatycznych, strzelistych gór pod jasnym, dziennym niebem z miękkimi, rozproszonymi chmurami. W dolinie w dole ukryta jest urokliwa, malownicza alpejska miejscowość z tradycyjnymi domami i wieżą małego kościółka. Kompozycja kinowa, oświetlenie złotej godziny lub jasne, naturalne światło dzienne, ostra ostrość, bogate faktury, styl fotografii podróżniczej, rozdzielczość 8k, fotorealistyczny.",
+  "refleksja": "",
+  "data": "2026-10-27"
+}
