@@ -1,0 +1,12 @@
+{
+  "tytul": "Avatar AI",
+  "opis": "celem było zrobienie filmu z podłożonym głosem i zsynchronizowanom mową",
+  "narzedzia": [
+    "lipsyncai",
+    "elevenlabs"
+  ],
+  "szczegoly": "",
+  "prompt": "",
+  "refleksja": "",
+  "data": "2026-10-29"
+}
