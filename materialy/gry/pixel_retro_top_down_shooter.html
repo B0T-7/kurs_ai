@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Retro Pixel Platformer 90s</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+        body {
+            font-family: 'Press Start 2P', monospace;
+            background-color: #090a0f;
+            color: #e2e8f0;
+            user-select: none;
+            overflow: hidden;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* Pixel art crisp rendering */
+        canvas {
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.8), 0 0 5px rgba(59, 130, 246, 0.3);
+        }
+
+        .pixel-border {
+            border: 4px solid #1e293b;
+            outline: 2px solid #475569;
+        }
+
+        .pixel-btn {
+            position: relative;
+            box-shadow: inset -4px -4px 0px 0px #0f172a, inset 4px 4px 0px 0px #475569;
+            transition: all 0.1s ease;
+        }
+
+        .pixel-btn:hover {
+            filter: brightness(1.2);
+            transform: translateY(-2px);
+        }
+
+        .pixel-btn:active {
+            box-shadow: inset 4px 4px 0px 0px #0f172a, inset -4px -4px 0px 0px #475569;
+            transform: translateY(2px);
+        }
+
+        .pixel-btn.active {
+            box-shadow: inset 4px 4px 0px 0px #0284c7, inset -4px -4px 0px 0px #38bdf8;
+            background-color: #0369a1 !important;
+        }
+
+        /* Custom styling for inputs */
+        input[type=range] {
+            -webkit-appearance: none;
+            background: #1e293b;
+            border: 2px solid #475569;
+            height: 12px;
+            border-radius: 0;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 20px;
+            width: 14px;
+            background: #38bdf8;
+            border: 2px solid #ffffff;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center min-h-screen bg-slate-950 p-2 md:p-4">
+
+    <!-- Game Container -->
+    <div class="relative w-full max-w-5xl flex flex-col items-center">
+        
+        <!-- Header / Top HUD Panel -->
+        <div class="w-full bg-slate-900 border-b-4 border-slate-700 p-3 mb-2 flex flex-wrap items-center justify-between text-xs gap-3 rounded-t-lg">
+            
+            <!-- Character Selector -->
+            <div class="flex items-center space-x-2">
+                <span class="text-slate-400 hidden sm:inline">POSTAĆ:</span>
+                <div class="flex space-x-1">
+                    <button id="btn-char-red" onclick="selectCharacter('red')" class="pixel-btn px-2 py-1 bg-red-900 text-red-200 border border-red-700 text-[10px] active">
+                        BORDO
+                    </button>
+                    <button id="btn-char-black" onclick="selectCharacter('black')" class="pixel-btn px-2 py-1 bg-slate-800 text-slate-300 border border-slate-600 text-[10px]">
+                        CZARNY
+                    </button>
+                    <button id="btn-char-gray" onclick="selectCharacter('gray')" class="pixel-btn px-2 py-1 bg-slate-300 text-slate-950 border border-slate-100 text-[10px]">
+                        SZARY
+                    </button>
+                </div>
+            </div>
+
+            <!-- Stats Header Info -->
+            <div class="flex items-center space-x-4">
+                <div class="text-amber-400">PKT: <span id="hud-score">0</span></div>
+                <div class="text-emerald-400">ZABICI: <span id="hud-kills">0</span></div>
+                <div class="text-cyan-400">DYSTANS: <span id="hud-dist">0</span>m</div>
+            </div>
+
+            <!-- Difficulty Slider (Top Right) -->
+            <div class="flex items-center space-x-2">
+                <span class="text-slate-400 text-[10px]">TRUDNOŚĆ:</span>
+                <div class="flex flex-col items-end">
+                    <input type="range" id="difficulty-slider" min="0" max="2" step="1" value="0" class="w-24 cursor-pointer" onchange="changeDifficulty(parseInt(this.value))">
+                    <div class="flex justify-between w-full text-[8px] text-slate-400 mt-1">
+                        <span id="diff-lbl-0" class="text-emerald-400 font-bold">ŁATWY</span>
+                        <span id="diff-lbl-1" class="opacity-50">NORM</span>
+                        <span id="diff-lbl-2" class="opacity-50">TRUD</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Canvas Container -->
+        <div class="relative w-full aspect-[16/9] max-h-[70vh] bg-slate-900 pixel-border overflow-hidden rounded-b-lg">
+            <canvas id="gameCanvas" class="w-full h-full block bg-slate-950"></canvas>
+
+            <!-- On-Canvas HUD Overlay -->
+            <div class="absolute top-3 left-3 flex flex-col space-y-1 pointer-events-none">
+                <!-- HP Bar -->
+                <div class="flex items-center space-x-2 bg-slate-900/80 p-1.5 rounded border border-slate-700">
+                    <span class="text-red-500 text-xs font-bold">HP:</span>
+                    <div class="w-32 h-4 bg-slate-950 border border-slate-700 p-0.5 flex">
+                        <div id="hp-bar-fill" class="h-full bg-red-600 transition-all duration-200" style="width: 100%;"></div>
+                    </div>
+                    <span id="hp-text" class="text-xs text-white">10/10</span>
+                </div>
+                <!-- Kill Counter for Heal -->
+                <div class="text-[9px] text-slate-400 bg-slate-900/80 px-2 py-0.5 rounded border border-slate-800 w-fit">
+                    REGEN: <span id="heal-counter" class="text-emerald-400">0</span>/5 WROGÓW
+                </div>
+            </div>
+
+            <!-- Controls Overlay Hint -->
+            <div class="absolute bottom-2 left-2 text-[8px] text-slate-500 bg-slate-950/70 p-1 rounded pointer-events-none">
+                RUCH: [A][D] | SKOK: [W] | OPADANIE: [S] | STRZAŁ: [SPACJA] / L.MYSZ
+            </div>
+
+            <!-- Game Over Screen Overlay -->
+            <div id="game-over-modal" class="hidden absolute inset-0 bg-slate-950/90 backdrop-blur-sm flex flex-col items-center justify-center p-4 z-20">
+                <div class="bg-slate-900 border-4 border-red-700 p-6 max-w-md w-full text-center rounded-lg shadow-2xl">
+                    <h2 class="text-red-500 text-xl font-bold mb-4 animate-pulse">KONIEC GRY!</h2>
+                    <p class="text-slate-300 text-xs mb-4">TWÓJ BOHATER ZOSTAŁ POKONANY</p>
+
+                    <!-- Summary Statistics -->
+                    <div class="bg-slate-950 p-4 rounded border border-slate-800 text-xs space-y-2 text-left mb-6">
+                        <div class="flex justify-between">
+                            <span class="text-slate-400">CZAS GRY:</span>
+                            <span id="go-time" class="text-yellow-400">00:00</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-slate-400">PUNKTY:</span>
+                            <span id="go-score" class="text-amber-400">0</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-slate-400">PRZEBYTY DYSTANS:</span>
+                            <span id="go-distance" class="text-cyan-400">0 m</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-slate-400">POKONANI WROGOWIE:</span>
+                            <span id="go-kills" class="text-emerald-400">0</span>
+                        </div>
+                    </div>
+
+                    <div class="text-xs mb-4 text-slate-300">CZY CHCESZ ZAGRAĆ PONOWNIE?</div>
+
+                    <div class="flex justify-center space-x-4">
+                        <button onclick="restartGame()" class="pixel-btn px-4 py-2 bg-emerald-700 text-emerald-100 border border-emerald-500 text-xs font-bold">
+                            TAK (RESTART)
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- CONSTANTS & CONFIGURATION ---
+        const TILE_SIZE = 32; // Logical tile size
+        const MAX_HP = 10;
+        const SHOOT_COOLDOWN = 300; // 0.3 seconds in ms
+        const BULLET_MAX_RANGE = TILE_SIZE * 5; // 5 tiles range limit
+
+        // Difficulty configs
+        // Index 0: Łatwy, 1: Normalny, 2: Trudny
+        const DIFFICULTY_SETTINGS = [
+            { name: "Łatwy", enemyMult: 1.0, enemySizeMult: 1.0, reachMult: 1.0 },
+            { name: "Normalny", enemyMult: 1.3, enemySizeMult: 0.9, reachMult: 1.05 },
+            { name: "Trudny", enemyMult: 1.6, enemySizeMult: 0.8, reachMult: 1.10 }
+        ];
+
+        // Character color themes
+        const CHAR_CONFIGS = {
+            red: { body: '#881337', accent: '#f43f5e', visor: '#ffffff' },
+            black: { body: '#18181b', accent: '#52525b', visor: '#38bdf8' },
+            gray: { body: '#cbd5e1', accent: '#64748b', visor: '#0f172a' }
+        };
+
+        // Enemy Types Configuration - Slightly increased speed while maintaining retro feel
+        const ENEMY_TYPES = [
+            { type: 'easy', color: '#4ade80', name: 'Jasno-zielony', speed: 0.95, detectDist: 9 * TILE_SIZE, hp: 1, baseScore: 100 },
+            { type: 'normal', color: '#1d4ed8', name: 'Ciemno-niebieski', speed: 1.15, detectDist: 10 * TILE_SIZE, hp: 1, baseScore: 200 },
+            { type: 'hard', color: '#06b6d4', name: 'Jaskrawo-niebieski', speed: 1.35, detectDist: 11 * TILE_SIZE, hp: 2, baseScore: 350 }
+        ];
+
+        // --- GAME STATE ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let cameraX = 0;
+        let cameraY = 0;
+        let currentDifficultyIndex = 0;
+        let selectedCharacter = 'red';
+        let lastTime = performance.now();
+        let startTime = performance.now();
+        let isGameOver = false;
+
+        // Player Stats - Reduced speed to 1.4 for deliberate tactical pace
+        let player = {
+            x: 200,
+            y: 200,
+            width: 22,
+            height: 22,
+            vx: 0,
+            vy: 0,
+            speed: 1.4,
+            hp: MAX_HP,
+            angle: 0,
+            lastShootTime: 0,
+            startX: 200,
+            startY: 200,
+            distanceTraveled: 0,
+            killsForHeal: 0,
+            totalKills: 0,
+            score: 0
+        };
+
+        // Entities arrays
+        let bullets = [];
+        let enemies = [];
+        let particles = [];
+
+        // Input state
+        const keys = {};
+        let mousePos = { x: 0, y: 0 };
+
+        // World procedural grid cache (Chunks of Top-down corridors)
+        const chunks = {};
+        const CHUNK_SIZE = 16; // 16x16 tiles per chunk
+
+        function resizeCanvas() {
+            const container = canvas.parentElement;
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // Track Mouse position relative to canvas center for top-down aiming
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            mousePos.x = e.clientX - rect.left;
+            mousePos.y = e.clientY - rect.top;
+        });
+
+        window.addEventListener('keydown', (e) => {
+            keys[e.code] = true;
+            if (e.code === 'Space') {
+                e.preventDefault();
+                shootBullet();
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            keys[e.code] = false;
+        });
+
+        canvas.addEventListener('mousedown', (e) => {
+            if (e.button === 0) {
+                shootBullet();
+            }
+        });
+
+        // --- TOP-DOWN PROCEDURAL CORRIDOR GENERATION ---
+        function getChunkKey(cx, cy) {
+            return `${cx},${cy}`;
+        }
+
+        function getChunk(cx, cy) {
+            const key = getChunkKey(cx, cy);
+            if (chunks[key]) return chunks[key];
+
+            const chunk = [];
+            const startX = cx * CHUNK_SIZE * TILE_SIZE;
+            const startY = cy * CHUNK_SIZE * TILE_SIZE;
+
+            // Generate Top-Down Corridor walls & cover obstacles
+            for (let rx = 0; rx < CHUNK_SIZE; rx++) {
+                for (let ry = 0; ry < CHUNK_SIZE; ry++) {
+                    const worldX = startX + rx * TILE_SIZE;
+                    const worldY = startY + ry * TILE_SIZE;
+
+                    // Wide Corridor Outer Walls with broad passages (3 tiles wide)
+                    const isBorder = (rx === 0 || rx === CHUNK_SIZE - 1 || ry === 0 || ry === CHUNK_SIZE - 1);
+                    const isPassage = (rx >= 6 && rx <= 9) || (ry >= 6 && ry <= 9);
+
+                    if (isBorder && !isPassage && !(cx === 0 && cy === 0)) {
+                        chunk.push({
+                            x: worldX,
+                            y: worldY,
+                            w: TILE_SIZE,
+                            h: TILE_SIZE,
+                            type: 'wall'
+                        });
+                    } else if (!isBorder && Math.abs(Math.sin(cx * 17 + cy * 31 + rx * 5 + ry * 7)) > 0.94) {
+                        // Internal hide covers / pillars reduced by ~70% (threshold 0.94)
+                        chunk.push({
+                            x: worldX + 8,
+                            y: worldY + 8,
+                            w: TILE_SIZE - 16,
+                            h: TILE_SIZE - 16,
+                            type: 'cover'
+                        });
+                    }
+                }
+            }
+
+            chunks[key] = chunk;
+            return chunk;
+        }
+
+        function getVisibleObstacles() {
+            const minCx = Math.floor((cameraX - 100) / (CHUNK_SIZE * TILE_SIZE));
+            const maxCx = Math.floor((cameraX + canvas.width + 100) / (CHUNK_SIZE * TILE_SIZE));
+            const minCy = Math.floor((cameraY - 100) / (CHUNK_SIZE * TILE_SIZE));
+            const maxCy = Math.floor((cameraY + canvas.height + 100) / (CHUNK_SIZE * TILE_SIZE));
+
+            let visible = [];
+            for (let cx = minCx; cx <= maxCx; cx++) {
+                for (let cy = minCy; cy <= maxCy; cy++) {
+                    visible = visible.concat(getChunk(cx, cy));
+                }
+            }
+            return visible;
+        }
+
+        // --- CHARACTER & DIFFICULTY SWITCHING ---
+        function selectCharacter(type) {
+            selectedCharacter = type;
+            document.querySelectorAll('[id^="btn-char-"]').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(`btn-char-${type}`).classList.add('active');
+        }
+
+        function changeDifficulty(index) {
+            currentDifficultyIndex = index;
+            for (let i = 0; i <= 2; i++) {
+                const lbl = document.getElementById(`diff-lbl-${i}`);
+                if (i === index) {
+                    lbl.className = "text-emerald-400 font-bold opacity-100";
+                } else {
+                    lbl.className = "opacity-50";
+                }
+            }
+
+            // RESET POINTS ON DIFFICULTY CHANGE
+            player.score = 0;
+            document.getElementById('hud-score').innerText = '0';
+            enemies = [];
+        }
+
+        // --- SPAWN ENEMIES ---
+        function spawnEnemyWave() {
+            const diffConfig = DIFFICULTY_SETTINGS[currentDifficultyIndex];
+            const maxEnemies = Math.floor(5 * diffConfig.enemyMult);
+
+            if (enemies.length < maxEnemies) {
+                // Spawn randomly around camera bounds
+                const angle = Math.random() * Math.PI * 2;
+                const spawnDist = Math.max(canvas.width, canvas.height) / 2 + 50;
+                const spawnX = player.x + Math.cos(angle) * spawnDist;
+                const spawnY = player.y + Math.sin(angle) * spawnDist;
+
+                let typeIndex = 0;
+                // Only spawn 1 single type per selected difficulty level
+                if (currentDifficultyIndex === 0) {
+                    typeIndex = 0; // Łatwy -> wyłącznie Jasno-zielony
+                } else if (currentDifficultyIndex === 1) {
+                    typeIndex = 1; // Normalny -> wyłącznie Ciemno-niebieski
+                } else {
+                    typeIndex = 2; // Trudny -> wyłącznie Jaskrawo-niebieski
+                }
+
+                const baseType = ENEMY_TYPES[typeIndex];
+
+                // Scale sizes and attack reach according to difficulty rule
+                const enemyWidth = 22 * diffConfig.enemySizeMult;
+                const enemyHeight = 22 * diffConfig.enemySizeMult;
+                const attackReach = 18 * diffConfig.reachMult;
+
+                enemies.push({
+                    x: spawnX,
+                    y: spawnY,
+                    w: enemyWidth,
+                    h: enemyHeight,
+                    type: baseType,
+                    hp: baseType.hp,
+                    attackReach: attackReach,
+                    attackCooldown: 0,
+                    angle: 0,
+                    patrolTimer: 0,
+                    patrolAngle: Math.random() * Math.PI * 2
+                });
+            }
+        }
+
+        // --- SHOOTING MECHANICS ---
+        function shootBullet() {
+            const now = performance.now();
+            if (now - player.lastShootTime < SHOOT_COOLDOWN || isGameOver) return;
+
+            player.lastShootTime = now;
+
+            // Shoot towards current aim direction (Mouse or Movement orientation)
+            const bVx = Math.cos(player.angle) * 11;
+            const bVy = Math.sin(player.angle) * 11;
+
+            bullets.push({
+                x: player.x + player.width / 2,
+                y: player.y + player.height / 2,
+                vx: bVx,
+                vy: bVy,
+                startX: player.x,
+                startY: player.y,
+                travelled: 0,
+                size: 4
+            });
+        }
+
+        function createParticles(x, y, color, count = 5) {
+            for (let i = 0; i < count; i++) {
+                particles.push({
+                    x: x,
+                    y: y,
+                    vx: (Math.random() - 0.5) * 5,
+                    vy: (Math.random() - 0.5) * 5,
+                    life: 1,
+                    color: color,
+                    size: Math.random() * 3 + 2
+                });
+            }
+        }
+
+        // --- UPDATE LOOP ---
+        function update(dt) {
+            if (isGameOver) return;
+
+            // --- 1. WASD 8-DIRECTIONAL TOP-DOWN MOVEMENT ---
+            let moveX = 0;
+            let moveY = 0;
+
+            if (keys['KeyA'] || keys['ArrowLeft']) moveX -= 1;
+            if (keys['KeyD'] || keys['ArrowRight']) moveX += 1;
+            if (keys['KeyW'] || keys['ArrowUp']) moveY -= 1;
+            if (keys['KeyS'] || keys['ArrowDown']) moveY += 1;
+
+            // Normalize diagonal speed
+            if (moveX !== 0 && moveY !== 0) {
+                moveX *= 0.7071;
+                moveY *= 0.7071;
+            }
+
+            player.vx = moveX * player.speed;
+            player.vy = moveY * player.speed;
+
+            // Move Player and handle strict collisions with all obstacles (walls & covers)
+            player.x += player.vx;
+            checkCollisions(player, 'x');
+            player.y += player.vy;
+            checkCollisions(player, 'y');
+
+            // Player Aim Rotation toward mouse
+            const screenCenterX = canvas.width / 2;
+            const screenCenterY = canvas.height / 2;
+            player.angle = Math.atan2(mousePos.y - screenCenterY, mousePos.x - screenCenterX);
+
+            // Update Total Distance Traveled
+            const currentDist = Math.floor(Math.hypot(player.x - player.startX, player.y - player.startY) / TILE_SIZE);
+            if (currentDist > player.distanceTraveled) {
+                player.distanceTraveled = currentDist;
+                document.getElementById('hud-dist').innerText = player.distanceTraveled;
+            }
+
+            // Camera follow player
+            cameraX = player.x + player.width / 2 - canvas.width / 2;
+            cameraY = player.y + player.height / 2 - canvas.height / 2;
+
+            // --- 2. BULLETS UPDATE & COLLISION ---
+            const obstacles = getVisibleObstacles();
+
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                const b = bullets[i];
+                b.x += b.vx;
+                b.y += b.vy;
+                b.travelled += Math.hypot(b.vx, b.vy);
+
+                // Range limit check
+                if (b.travelled > BULLET_MAX_RANGE) {
+                    bullets.splice(i, 1);
+                    continue;
+                }
+
+                // Check bullet collision with walls & covers
+                let hitObstacle = false;
+                for (const o of obstacles) {
+                    if (b.x > o.x && b.x < o.x + o.w && b.y > o.y && b.y < o.y + o.h) {
+                        createParticles(b.x, b.y, '#94a3b8', 4);
+                        hitObstacle = true;
+                        break;
+                    }
+                }
+                if (hitObstacle) {
+                    bullets.splice(i, 1);
+                    continue;
+                }
+
+                // Check bullet collision with enemies
+                let bulletRemoved = false;
+                for (let j = enemies.length - 1; j >= 0; j--) {
+                    const e = enemies[j];
+                    if (b.x > e.x && b.x < e.x + e.w && b.y > e.y && b.y < e.y + e.h) {
+                        e.hp--;
+                        createParticles(b.x, b.y, '#ef4444', 6);
+                        bulletRemoved = true;
+
+                        if (e.hp <= 0) {
+                            // Distance-based points calculation (farther shot = more points)
+                            const distToEnemy = Math.hypot(player.x - e.x, player.y - e.y);
+                            const distanceBonus = Math.floor(distToEnemy * 1.5);
+                            const earnedScore = e.type.baseScore + distanceBonus;
+
+                            player.score += earnedScore;
+                            player.totalKills++;
+                            player.killsForHeal++;
+
+                            // Health Regeneration Check: 5 kills = 1 HP
+                            if (player.killsForHeal >= 5) {
+                                player.killsForHeal = 0;
+                                if (player.hp < MAX_HP) {
+                                    player.hp++;
+                                    updateHPUI();
+                                    createParticles(player.x + player.width/2, player.y + player.height/2, '#10b981', 10);
+                                }
+                            }
+
+                            document.getElementById('hud-score').innerText = player.score;
+                            document.getElementById('hud-kills').innerText = player.totalKills;
+                            document.getElementById('heal-counter').innerText = player.killsForHeal;
+
+                            enemies.splice(j, 1);
+                        }
+                        break;
+                    }
+                }
+
+                if (bulletRemoved) {
+                    bullets.splice(i, 1);
+                }
+            }
+
+            // --- 3. ENEMIES AI (TOP-DOWN MELEE ATTACKERS & PATROL) ---
+            spawnEnemyWave();
+
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                const e = enemies[i];
+                const dx = (player.x + player.width / 2) - (e.x + e.w / 2);
+                const dy = (player.y + player.height / 2) - (e.y + e.h / 2);
+                const distToPlayer = Math.hypot(dx, dy);
+
+                if (e.attackCooldown > 0) e.attackCooldown -= dt;
+
+                // Patrol or Chase logic with Obstacle Avoidance Steering
+                if (distToPlayer <= e.type.detectDist) {
+                    // Calculate direct target angle towards player
+                    let targetAngle = Math.atan2(dy, dx);
+                    
+                    // Raycast check: see if an obstacle is immediately ahead in target direction
+                    const lookAheadDist = 28;
+                    const aheadX = (e.x + e.w / 2) + Math.cos(targetAngle) * lookAheadDist;
+                    const aheadY = (e.y + e.h / 2) + Math.sin(targetAngle) * lookAheadDist;
+                    
+                    let blockedAhead = false;
+                    for (const o of obstacles) {
+                        if (aheadX > o.x && aheadX < o.x + o.w && aheadY > o.y && aheadY < o.y + o.h) {
+                            blockedAhead = true;
+                            break;
+                        }
+                    }
+
+                    // If path ahead is blocked, steer around the obstacle (whisker avoidance)
+                    if (blockedAhead) {
+                        // Test left and right angles (+45 deg / -45 deg) to find clear path
+                        const leftAngle = targetAngle - Math.PI / 4;
+                        const rightAngle = targetAngle + Math.PI / 4;
+                        
+                        let leftBlocked = false;
+                        let rightBlocked = false;
+                        
+                        const leftX = (e.x + e.w / 2) + Math.cos(leftAngle) * lookAheadDist;
+                        const leftY = (e.y + e.h / 2) + Math.sin(leftAngle) * lookAheadDist;
+                        const rightX = (e.x + e.w / 2) + Math.cos(rightAngle) * lookAheadDist;
+                        const rightY = (e.y + e.h / 2) + Math.sin(rightAngle) * lookAheadDist;
+
+                        for (const o of obstacles) {
+                            if (leftX > o.x && leftX < o.x + o.w && leftY > o.y && leftY < o.y + o.h) leftBlocked = true;
+                            if (rightX > o.x && rightX < o.x + o.w && rightY > o.y && rightY < o.y + o.h) rightBlocked = true;
+                        }
+
+                        if (!leftBlocked) {
+                            targetAngle = leftAngle;
+                        } else if (!rightBlocked) {
+                            targetAngle = rightAngle;
+                        } else {
+                            targetAngle += Math.PI / 2; // Turn sideways if both sides blocked
+                        }
+                    }
+
+                    // Smooth transition to steer angle
+                    e.angle = targetAngle;
+                    const eVx = Math.cos(e.angle) * e.type.speed;
+                    const eVy = Math.sin(e.angle) * e.type.speed;
+
+                    e.vx = eVx;
+                    e.vy = eVy;
+
+                    e.x += eVx;
+                    checkCollisions(e, 'x');
+                    e.y += eVy;
+                    checkCollisions(e, 'y');
+
+                    // Close-range Melee Knife Attack
+                    if (distToPlayer <= (e.w / 2 + player.width / 2 + e.attackReach)) {
+                        if (e.attackCooldown <= 0) {
+                            e.attackCooldown = 800; // Attack cooldown
+                            takeDamage(1);
+                            createParticles(player.x + player.width / 2, player.y + player.height / 2, '#dc2626', 8);
+                        }
+                    }
+                } else {
+                    // Random Wandering Patrol
+                    e.patrolTimer -= dt;
+                    if (e.patrolTimer <= 0) {
+                        e.patrolAngle = Math.random() * Math.PI * 2;
+                        e.patrolTimer = 2000 + Math.random() * 3000;
+                    }
+
+                    e.angle = e.patrolAngle;
+                    const patrolVx = Math.cos(e.patrolAngle) * (e.type.speed * 0.6);
+                    const patrolVy = Math.sin(e.patrolAngle) * (e.type.speed * 0.6);
+
+                    e.vx = patrolVx;
+                    e.vy = patrolVy;
+
+                    const prevX = e.x;
+                    const prevY = e.y;
+
+                    e.x += patrolVx;
+                    checkCollisions(e, 'x');
+                    e.y += patrolVy;
+                    checkCollisions(e, 'y');
+
+                    // If hit a wall/obstacle during patrol, pick a new direction
+                    if (e.x === prevX || e.y === prevY) {
+                        e.patrolAngle = Math.random() * Math.PI * 2;
+                    }
+                }
+
+                // Despawn if way out of screen range
+                if (distToPlayer > canvas.width * 2) {
+                    enemies.splice(i, 1);
+                }
+            }
+
+            // --- 4. PARTICLES UPDATE ---
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life -= 0.05;
+                if (p.life <= 0) particles.splice(i, 1);
+            }
+        }
+
+        // --- COLLISION RESOLUTION FOR TOP-DOWN (STRICT & UNIFORM FOR BOTH PLAYER & NPCS) ---
+        function checkCollisions(entity, axis) {
+            const obstacles = getVisibleObstacles();
+            for (const o of obstacles) {
+                // AABB box intersection check for walls and cover obstacles
+                if (entity.x < o.x + o.w && entity.x + entity.w > o.x &&
+                    entity.y < o.y + o.h && entity.y + entity.h > o.y) {
+                    if (axis === 'x') {
+                        if (entity.vx > 0) {
+                            entity.x = o.x - entity.w;
+                        } else if (entity.vx < 0) {
+                            entity.x = o.x + o.w;
+                        }
+                        entity.vx = 0; // Zero out horizontal momentum (instant braking)
+                    }
+                    if (axis === 'y') {
+                        if (entity.vy > 0) {
+                            entity.y = o.y - entity.h;
+                        } else if (entity.vy < 0) {
+                            entity.y = o.y + o.h;
+                        }
+                        entity.vy = 0; // Zero out vertical momentum (instant braking)
+                    }
+                }
+            }
+        }
+
+        // --- DAMAGE & HEALTH SYSTEM ---
+        function takeDamage(amount) {
+            player.hp = Math.max(0, player.hp - amount);
+            updateHPUI();
+
+            if (player.hp <= 0) {
+                triggerGameOver();
+            }
+        }
+
+        function updateHPUI() {
+            const fill = document.getElementById('hp-bar-fill');
+            const hpText = document.getElementById('hp-text');
+            const pct = (player.hp / MAX_HP) * 100;
+            fill.style.width = `${pct}%`;
+            hpText.innerText = `${player.hp}/${MAX_HP}`;
+        }
+
+        // --- RENDERING TOP-DOWN VIEW ---
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            ctx.save();
+            ctx.translate(-Math.floor(cameraX), -Math.floor(cameraY));
+
+            // 1. Render Dark Floor Grid
+            const startX = Math.floor(cameraX / TILE_SIZE) * TILE_SIZE - TILE_SIZE;
+            const startY = Math.floor(cameraY / TILE_SIZE) * TILE_SIZE - TILE_SIZE;
+            const endX = startX + canvas.width + TILE_SIZE * 2;
+            const endY = startY + canvas.height + TILE_SIZE * 2;
+
+            ctx.fillStyle = '#090a0f';
+            ctx.fillRect(startX, startY, endX - startX, endY - startY);
+
+            ctx.strokeStyle = '#1e293b';
+            ctx.lineWidth = 1;
+            for (let x = startX; x < endX; x += TILE_SIZE) {
+                ctx.beginPath();
+                ctx.moveTo(x, startY);
+                ctx.lineTo(x, endY);
+                ctx.stroke();
+            }
+            for (let y = startY; y < endY; y += TILE_SIZE) {
+                ctx.beginPath();
+                ctx.moveTo(startX, y);
+                ctx.lineTo(endX, y);
+                ctx.stroke();
+            }
+
+            // 2. Render Walls and Cover Pillars
+            const visibleObstacles = getVisibleObstacles();
+            for (const o of visibleObstacles) {
+                if (o.type === 'wall') {
+                    ctx.fillStyle = '#1e293b';
+                    ctx.fillRect(o.x, o.y, o.w, o.h);
+                    ctx.strokeStyle = '#475569';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(o.x, o.y, o.w, o.h);
+                } else if (o.type === 'cover') {
+                    ctx.fillStyle = '#0f172a';
+                    ctx.fillRect(o.x, o.y, o.w, o.h);
+                    ctx.strokeStyle = '#38bdf8';
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(o.x, o.y, o.w, o.h);
+                }
+            }
+
+            // 3. Render Bullets
+            ctx.fillStyle = '#fde047';
+            for (const b of bullets) {
+                ctx.fillRect(b.x - b.size / 2, b.y - b.size / 2, b.size, b.size);
+            }
+
+            // 4. Render Enemies (Top-down view with knives)
+            for (const e of enemies) {
+                ctx.save();
+                ctx.translate(e.x + e.w / 2, e.y + e.h / 2);
+                ctx.rotate(e.angle);
+
+                // Enemy Body (Circle/Square hybrid)
+                ctx.fillStyle = e.type.color;
+                ctx.fillRect(-e.w / 2, -e.h / 2, e.w, e.h);
+
+                // Melee Knife
+                ctx.fillStyle = '#cbd5e1'; // Blade
+                ctx.fillRect(e.w / 2, -2, e.attackReach, 4);
+                ctx.fillStyle = '#991b1b'; // Red Handle
+                ctx.fillRect(e.w / 2 - 2, -3, 4, 6);
+
+                ctx.restore();
+            }
+
+            // 5. Render Player Character (Top-down view)
+            const charStyle = CHAR_CONFIGS[selectedCharacter];
+            ctx.save();
+            ctx.translate(player.x + player.width / 2, player.y + player.height / 2);
+            ctx.rotate(player.angle);
+
+            // Body
+            ctx.fillStyle = charStyle.body;
+            ctx.fillRect(-player.width / 2, -player.height / 2, player.width, player.height);
+
+            // Accent Shoulder Armor
+            ctx.fillStyle = charStyle.accent;
+            ctx.fillRect(-player.width / 2, -player.height / 2, 6, player.height);
+
+            // Visor Direction Indicator
+            ctx.fillStyle = charStyle.visor;
+            ctx.fillRect(2, -3, 6, 6);
+
+            // Pistol Gun
+            ctx.fillStyle = '#475569';
+            ctx.fillRect(player.width / 2 - 2, 4, 8, 4);
+
+            ctx.restore();
+
+            // 6. Render Particles
+            for (const p of particles) {
+                ctx.fillStyle = p.color;
+                ctx.globalAlpha = Math.max(0, p.life);
+                ctx.fillRect(p.x, p.y, p.size, p.size);
+                ctx.globalAlpha = 1.0;
+            }
+
+            ctx.restore();
+        }
+
+        // --- GAME OVER & RESTART ---
+        function triggerGameOver() {
+            isGameOver = true;
+
+            const elapsedTimeSeconds = Math.floor((performance.now() - startTime) / 1000);
+            const mins = Math.floor(elapsedTimeSeconds / 60).toString().padStart(2, '0');
+            const secs = (elapsedTimeSeconds % 60).toString().padStart(2, '0');
+
+            document.getElementById('go-time').innerText = `${mins}:${secs}`;
+            document.getElementById('go-score').innerText = player.score;
+            document.getElementById('go-distance').innerText = `${player.distanceTraveled} m`;
+            document.getElementById('go-kills').innerText = player.totalKills;
+
+            document.getElementById('game-over-modal').classList.remove('hidden');
+        }
+
+        function restartGame() {
+            isGameOver = false;
+            player.hp = MAX_HP;
+            player.x = 200;
+            player.y = 200;
+            player.vx = 0;
+            player.vy = 0;
+            player.score = 0;
+            player.totalKills = 0;
+            player.killsForHeal = 0;
+            player.distanceTraveled = 0;
+            player.startX = 200;
+            player.startY = 200;
+
+            enemies = [];
+            bullets = [];
+            particles = [];
+            cameraX = 0;
+            cameraY = 0;
+            startTime = performance.now();
+
+            updateHPUI();
+            document.getElementById('hud-score').innerText = '0';
+            document.getElementById('hud-kills').innerText = '0';
+            document.getElementById('hud-dist').innerText = '0';
+            document.getElementById('heal-counter').innerText = '0';
+
+            document.getElementById('game-over-modal').classList.add('hidden');
+        }
+
+        // --- MAIN LOOP ---
+        function gameLoop(timestamp) {
+            const dt = timestamp - lastTime;
+            lastTime = timestamp;
+
+            update(dt);
+            draw();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        window.onload = function() {
+            requestAnimationFrame(gameLoop);
+        };
+    </script>
+</body>
+</html>
